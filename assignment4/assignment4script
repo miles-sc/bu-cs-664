@@ -1,0 +1,171 @@
+import numpy as np
+import skfuzzy as fuzz
+from skfuzzy import control as ctrl
+import matplotlib.pyplot as plt
+
+# ================================
+# Step 1: Define universes
+# ================================
+engine_size_universe = np.linspace(1.5, 6.5, 2001)    # liters
+weight_universe      = np.linspace(2200, 6200, 4001)  # lbs
+accel_universe       = np.linspace(2.7, 9.1, 3001)    # seconds 0-60
+
+# ================================
+# Step 2: Define fuzzy variables
+# ================================
+engine_size = ctrl.Antecedent(engine_size_universe, 'engine_size')
+vehicle_weight = ctrl.Antecedent(weight_universe, 'vehicle_weight')
+acceleration = ctrl.Consequent(accel_universe, 'acceleration')
+
+# ================================
+# Step 3: Membership functions
+# ================================
+
+# --- Engine size (liters) ---
+engine_size['very_small'] = fuzz.trapmf(engine_size_universe, [1.5, 1.5, 1.5, 2.4])
+engine_size['small']      = fuzz.trimf(engine_size_universe, [1.5, 2.4, 3.5])
+engine_size['medium']     = fuzz.trimf(engine_size_universe, [2.4, 3.5, 5.0])
+engine_size['large']      = fuzz.trimf(engine_size_universe, [3.5, 5.0, 6.5])
+engine_size['very_large'] = fuzz.trapmf(engine_size_universe, [5.0, 6.5, 6.5, 6.5])
+
+# --- Vehicle weight (lbs) ---
+vehicle_weight['very_light'] = fuzz.trapmf(weight_universe, [2200, 2200, 2200, 3200])
+vehicle_weight['light']      = fuzz.trimf(weight_universe, [2200, 3200, 3700])
+vehicle_weight['medium']     = fuzz.trimf(weight_universe, [3200, 3700, 4500])
+vehicle_weight['heavy']      = fuzz.trimf(weight_universe, [3700, 4500, 6200])
+vehicle_weight['very_heavy'] = fuzz.trapmf(weight_universe, [4500, 6200, 6200, 6200])
+
+# --- Acceleration (seconds, 0-60 mph) ---
+acceleration['very_fast'] = fuzz.trapmf(accel_universe, [2.7, 2.7, 2.7, 5.5])
+acceleration['fast']      = fuzz.trimf(accel_universe, [2.7, 5.5, 6.2])
+acceleration['medium']    = fuzz.trimf(accel_universe, [5.5, 6.2, 8.3])
+acceleration['slow']      = fuzz.trimf(accel_universe, [6.2, 8.3, 9.1])
+acceleration['very_slow'] = fuzz.trapmf(accel_universe, [8.3, 9.1, 9.1, 9.1])
+
+# ================================
+# Step 4: Rules
+# ================================
+rule1 = ctrl.Rule(vehicle_weight['light'] & engine_size['large'], acceleration['very_fast'])
+rule2 = ctrl.Rule(vehicle_weight['medium'] & engine_size['small'], acceleration['slow'])
+rule3 = ctrl.Rule(vehicle_weight['heavy'] & engine_size['large'], acceleration['medium'])
+
+rules = [rule1, rule2, rule3]
+
+# ================================
+# Step 5: Control System
+# ================================
+accel_ctrl = ctrl.ControlSystem(rules)
+accel_sim = ctrl.ControlSystemSimulation(accel_ctrl)
+
+# ================================
+# Step 6: Evaluation Example (Rule 1 focus)
+# ================================
+
+# Store test cases
+cases = [
+    {"name": "Chevrolet Corvette Stingray (2025)", "weight": 3366, "engine": 6.1, "true_accel": 2.8},
+    {"name": "Toyota RAV4 (2025)",                 "weight": 3719, "engine": 2.5, "true_accel": 8.3},
+]
+
+rules = [
+    ("Rule 1: light ∧ large ⇒ very_fast", "light", "large", "very_fast"),
+    ("Rule 2: medium ∧ small ⇒ slow",      "medium", "small", "slow"),
+    ("Rule 3: heavy ∧ large ⇒ medium",     "heavy", "large", "medium"),
+]
+
+accel_sets = {
+    "very_fast": acceleration.terms['very_fast'].mf,
+    "fast": acceleration.terms['fast'].mf,
+    "medium": acceleration.terms['medium'].mf,
+    "slow": acceleration.terms['slow'].mf,
+    "very_slow": acceleration.terms['very_slow'].mf,
+}
+
+def eval_rule(case, rule):
+    rule_name, wt_term, eng_term, acc_term = rule
+    wt_val = case['weight']
+    eng_val = case['engine']
+
+    # Calculate membership degrees using .mf
+    mu_wt = fuzz.interp_membership(weight_universe, vehicle_weight.terms[wt_term].mf, wt_val)
+    mu_eng = fuzz.interp_membership(engine_size_universe, engine_size.terms[eng_term].mf, eng_val)
+
+    # Firing strength = min of antecedents
+    firing = min(mu_wt, mu_eng)
+
+    # Pretty print results
+    print(f"\n=== {rule_name} for {case['name']} ===")
+    print(f"Vehicle weight: {wt_val} lbs → μ({wt_term}) = {mu_wt:.3f}")
+    print(f"Engine size: {eng_val:.1f} L → μ({eng_term}) = {mu_eng:.3f}")
+    print(f"Rule firing strength = min({mu_wt:.3f}, {mu_eng:.3f}) = {firing:.3f}")
+
+     # Consequent membership function (before clipping)
+    base = acceleration.terms[acc_term].mf
+    # Clip at firing strength
+    clipped = np.minimum(base, firing)
+
+    # --- Plot ---
+    plt.figure()
+    plt.plot(accel_universe, base, 'b--', linewidth=2, label=f"{acc_term} (base)")
+    plt.plot(accel_universe, clipped, 'r-', linewidth=2, label=f"{acc_term} (clipped)")
+    plt.axhline(firing, linestyle="--", color="gray", label=f"firing = {firing:.2f}")
+
+    plt.title(f"{case['name']} — {rule_name}")
+    plt.xlabel("0–60 time (s)")
+    plt.ylabel("Membership")
+    plt.legend()
+    plt.tight_layout()
+
+def compute_area_and_centroid(universe, mf):
+    """Compute area and centroid (center of gravity) for a clipped MF."""
+    area = np.trapezoid(mf, universe)
+    if area == 0:
+        centroid = None
+    else:
+        centroid = np.trapezoid(universe * mf, universe) / area
+    return area, centroid
+
+# Run all rules for both cases
+for case in cases:
+    for rule in rules:
+        eval_rule(case, rule)
+
+# ================================
+# Step 7: Overlay non-trivial rule outputs per case
+# ================================
+for case in cases:
+    print(f"\n=== Overlay plot for {case['name']} ===")
+    plt.figure()
+
+    for rule in rules:
+        rule_name, wt_term, eng_term, acc_term = rule
+        wt_val = case['weight']
+        eng_val = case['engine']
+
+        # Antecedent degrees
+        mu_wt = fuzz.interp_membership(weight_universe, vehicle_weight.terms[wt_term].mf, wt_val)
+        mu_eng = fuzz.interp_membership(engine_size_universe, engine_size.terms[eng_term].mf, eng_val)
+        firing = min(mu_wt, mu_eng)
+
+        if firing > 0:
+            base = acceleration.terms[acc_term].mf
+            clipped = np.minimum(base, firing)
+
+            # Compute area & centroid
+            area, centroid = compute_area_and_centroid(accel_universe, clipped)
+
+            # Pretty print
+            centroid_str = f"{centroid:.3f}" if centroid is not None else "n/a"
+            print(f"{rule_name}: firing={firing:.3f}, area={area:.3f}, centroid={centroid_str}")
+
+            # Overlay on plot
+            plt.plot(accel_universe, clipped, linewidth=2, label=f"{rule_name} (fire={firing:.2f})")
+
+    plt.title(f"{case['name']} — Overlay of Rule Outputs")
+    plt.xlabel("0–60 time (s)")
+    plt.ylabel("Membership")
+    plt.legend()
+    plt.ylim(0, 1)
+    plt.tight_layout()
+
+plt.show()
