@@ -164,8 +164,23 @@ for case in cases:
             centroid_str = f"{centroid:.3f}" if centroid is not None else "n/a"
             print(f"{rule_name}: firing={firing:.3f}, area={area:.3f}, centroid={centroid_str}")
 
-            # Overlay on plot
-            plt.plot(accel_universe, clipped, linewidth=2, label=f"{rule_name} (fire={firing:.2f})")
+            # Overlay on plot (line + shaded fill)
+            line, = plt.plot(accel_universe, clipped, linewidth=2, label=f"{rule_name} (fire={firing:.2f})")
+            plt.fill_between(accel_universe, clipped, alpha=0.2, color=line.get_color())  # shaded area
+
+            # Show centroid as vertical dashed line (no legend entry)
+            if centroid is not None:
+                plt.axvline(centroid, linestyle="--", color=line.get_color(), alpha=0.7)
+
+            # Add text box for area + centroid
+            x_pos = centroid if centroid is not None else (accel_universe[0] + accel_universe[-1]) / 2
+            y_pos = firing * 0.5  # halfway up the clipped height
+            centroid_str = f"{centroid:.3f}" if centroid is not None else "n/a"
+            plt.text(x_pos, y_pos, f"Area={area:.3f}\nCentroid={centroid_str}",
+                    ha="center", va="center",
+                    fontsize=8,
+                    bbox=dict(facecolor="white", alpha=0.6, edgecolor=line.get_color()))
+
 
     plt.title(f"{case['name']} — Overlay of Rule Outputs")
     plt.xlabel("0–60 time (s)")
@@ -173,5 +188,6 @@ for case in cases:
     plt.legend()
     plt.ylim(0, 1)
     plt.tight_layout()
+
 
 plt.show()
