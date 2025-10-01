@@ -43,19 +43,21 @@ acceleration['slow']      = fuzz.trimf(accel_universe, [6.2, 8.3, 9.1])
 acceleration['very_slow'] = fuzz.trapmf(accel_universe, [8.3, 9.1, 9.1, 9.1])
 
 # ================================
-# Step 4: Rules
+# Step 4: Rules (ControlSystem)
 # ================================
-rule1 = ctrl.Rule(vehicle_weight['light'] & engine_size['large'], acceleration['very_fast'])
-rule2 = ctrl.Rule(vehicle_weight['medium'] & engine_size['small'], acceleration['slow'])
-rule3 = ctrl.Rule(vehicle_weight['heavy'] & engine_size['large'], acceleration['medium'])
+rule1 = ctrl.Rule(vehicle_weight['light']  & engine_size['large'],  acceleration['very_fast'])
+rule2 = ctrl.Rule(vehicle_weight['medium'] & engine_size['small'],  acceleration['slow'])
+rule3 = ctrl.Rule(vehicle_weight['heavy']  & engine_size['large'],  acceleration['medium'])
+rule4 = ctrl.Rule(vehicle_weight['heavy']  & engine_size['medium'], acceleration['slow'])  # NEW
 
-rules = [rule1, rule2, rule3]
+control_rules = [rule1, rule2, rule3, rule4]
+
 
 # ================================
 # Step 5: Control System
 # ================================
-accel_ctrl = ctrl.ControlSystem(rules)
-accel_sim = ctrl.ControlSystemSimulation(accel_ctrl)
+accel_ctrl = ctrl.ControlSystem(control_rules)
+accel_sim  = ctrl.ControlSystemSimulation(accel_ctrl)
 
 # ================================
 # Step 6: Evaluation Example (Rule 1 focus)
@@ -65,13 +67,17 @@ accel_sim = ctrl.ControlSystemSimulation(accel_ctrl)
 cases = [
     {"name": "Chevrolet Corvette Stingray (2025)", "weight": 3366, "engine": 6.1, "true_accel": 2.8},
     {"name": "Toyota RAV4 (2025)",                 "weight": 3719, "engine": 2.5, "true_accel": 8.3},
+    {"name": "Kia Telluride (2025)",               "weight": 4490, "engine": 3.8, "true_accel": 6.7},  # NEW
 ]
 
-rules = [
+
+spec_rules = [
     ("Rule 1: light ∧ large ⇒ very_fast", "light", "large", "very_fast"),
     ("Rule 2: medium ∧ small ⇒ slow",      "medium", "small", "slow"),
     ("Rule 3: heavy ∧ large ⇒ medium",     "heavy", "large", "medium"),
+    ("Rule 4: heavy ∧ medium ⇒ slow",      "heavy", "medium", "slow"),
 ]
+
 
 accel_sets = {
     "very_fast": acceleration.terms['very_fast'].mf,
@@ -127,7 +133,7 @@ def compute_area_and_centroid(universe, mf):
 
 # Run all rules for both cases
 for case in cases:
-    for rule in rules:
+    for rule in spec_rules:
         eval_rule(case, rule)
 
 # ================================
@@ -137,7 +143,7 @@ for case in cases:
     print(f"\n=== Overlay plot for {case['name']} ===")
     plt.figure()
 
-    for rule in rules:
+    for rule in spec_rules:
         rule_name, wt_term, eng_term, acc_term = rule
         wt_val = case['weight']
         eng_val = case['engine']
