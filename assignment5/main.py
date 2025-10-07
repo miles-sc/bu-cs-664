@@ -6,7 +6,7 @@ a game with different player configurations.
 """
 
 from game import Game
-from players import HumanPlayer, NPCPlayer
+from players import HumanPlayer, TicTacAgent
 
 
 def main():
@@ -14,8 +14,8 @@ def main():
     print("Welcome to Tic-Tac-Toe!")
     print("\nChoose game mode:")
     print("1. Human vs Human")
-    print("2. Human vs NPC")
-    print("3. NPC vs NPC")
+    print("2. Human vs Agent")
+    print("3. Agent vs Agent")
 
     try:
         choice = input("\nEnter your choice (1-3): ")
@@ -25,16 +25,16 @@ def main():
             player2 = HumanPlayer("O", "Player 2")
         elif choice == "2":
             player1 = HumanPlayer("X", "Player 1")
-            player2 = NPCPlayer("O", "Computer")
+            player2 = TicTacAgent("O", "Agent")
         elif choice == "3":
-            player1 = NPCPlayer("X", "Computer 1")
-            player2 = NPCPlayer("O", "Computer 2")
-            # Add a small delay for NPC vs NPC to make it watchable
-            input("\nPress Enter to watch the computers play...")
+            player1 = TicTacAgent("X", "Agent 1")
+            player2 = TicTacAgent("O", "Agent 2")
+            # Add a small delay for Agent vs Agent to make it watchable
+            input("\nPress Enter to watch the agents play...")
         else:
-            print("Invalid choice! Defaulting to Human vs NPC")
+            print("Invalid choice! Defaulting to Human vs Agent")
             player1 = HumanPlayer("X", "Player 1")
-            player2 = NPCPlayer("O", "Computer")
+            player2 = TicTacAgent("O", "Agent")
 
         # Create and start the game
         game = Game(player1, player2)
