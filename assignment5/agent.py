@@ -34,6 +34,7 @@ class TicTacAgent(Player):
         self.learning_enabled = learning_enabled
         self.last_state: Optional[dict] = None
         self.last_action: Optional[str] = None
+        self.metrics = None  # Optional metrics tracker
 
     def _can_win_this_turn(self, board: Board) -> bool:
         """Check if agent can win on this turn.
@@ -239,6 +240,10 @@ class TicTacAgent(Player):
             # Store state and action for next TD update
             self.last_state = state.copy()  # Important: copy the dict
             self.last_action = action_name
+
+            # Record action in metrics if available
+            if self.metrics:
+                self.metrics.record_action(action_name)
 
             print(f"{self.name} ({self.symbol}) chooses position {position} via {action_name}")
             return position

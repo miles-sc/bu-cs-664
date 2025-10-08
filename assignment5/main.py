@@ -10,6 +10,7 @@ from game import Game
 from players import HumanPlayer
 from agent import TicTacAgent
 from q_table import QTable
+from metrics import LearningMetrics
 
 
 def main():
@@ -110,12 +111,21 @@ def train_agents():
     wins_o = 0
     draws = 0
 
+    # Initialize metrics tracking
+    metrics = LearningMetrics()
+    interval = max(1, num_games // 5)  # Display metrics 5 times during training
+
     print(f"\nTraining for {num_games} games...")
-    print(f"Hyperparameters: alpha={q_table.alpha}, gamma={q_table.gamma}, epsilon={q_table.epsilon}\n")
+    print(f"Hyperparameters: alpha={q_table.alpha}, gamma={q_table.gamma}, epsilon={q_table.epsilon}")
+    print(f"Metrics will be displayed every {interval} games\n")
 
     for i in range(num_games):
         agent1 = TicTacAgent("X", "Agent 1", q_table=q_table, learning_enabled=True)
         agent2 = TicTacAgent("O", "Agent 2", q_table=q_table, learning_enabled=True)
+
+        # Pass metrics to agents for action tracking
+        agent1.metrics = metrics
+        agent2.metrics = metrics
 
         # Create game with silent mode option
         game = Game(agent1, agent2, q_table=q_table)
@@ -142,19 +152,37 @@ def train_agents():
         else:
             draws += 1
 
-        # Print progress
-        if (i + 1) % 100 == 0:
-            print(f"Progress: {i + 1}/{num_games} games")
-            print(f"  Stats: X wins: {wins_x}, O wins: {wins_o}, Draws: {draws}")
-            print(f"  Q-table size: {q_table.get_table_size()} entries")
+        # Display metrics at intervals
+        if (i + 1) % interval == 0:
+            metrics.record_strategic_qvalues(q_table, i + 1)
+            metrics.record_qtable_size(q_table.get_table_size())
+            metrics.display_metrics(i + 1, num_games)
+            metrics.reset_action_counts()  # Reset for next interval
 
-    # Final statistics
-    print(f"\n=== Training Complete ===")
+    # Final statistics and metrics
+    print(f"\n{'='*60}")
+    print(f"=== Training Complete ===")
+    print(f"{'='*60}")
     print(f"Total games: {num_games}")
     print(f"X wins: {wins_x} ({100*wins_x/num_games:.1f}%)")
     print(f"O wins: {wins_o} ({100*wins_o/num_games:.1f}%)")
     print(f"Draws: {draws} ({100*draws/num_games:.1f}%)")
-    print(f"Final Q-table size: {q_table.get_table_size()} entries")
+    print(f"\nFinal Q-table size: {q_table.get_table_size()} entries")
+
+    # Show final metrics
+    metrics.record_strategic_qvalues(q_table, num_games)
+    metrics.record_qtable_size(q_table.get_table_size())
+    print(f"\nFinal Strategic Learning:")
+    if metrics.can_win_best:
+        action, qval = metrics.can_win_best[-1]
+        print(f"  'Can Win' --> {action:20s} (Q={qval:>7.4f})")
+    if metrics.center_available_best:
+        action, qval = metrics.center_available_best[-1]
+        print(f"  'Center Available' --> {action:20s} (Q={qval:>7.4f})")
+    if metrics.must_block_best:
+        action, qval = metrics.must_block_best[-1]
+        print(f"  'Must Block' --> {action:20s} (Q={qval:>7.4f})")
+    print(f"{'='*60}\n")
 
     # Save Q-table
     save_choice = input("\nSave Q-table? (y/n): ")
