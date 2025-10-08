@@ -187,8 +187,11 @@ def train_agents():
     # Save Q-table
     save_choice = input("\nSave Q-table? (y/n): ")
     if save_choice.lower() == 'y':
-        q_table.save("q_table.pkl")
-        print("Q-table saved to q_table.pkl!")
+        filepath = "q_table.pkl"
+        q_table.save(filepath)
+        abs_path = os.path.abspath(filepath)
+        print(f"Q-table saved to: {abs_path}")
+        print(f"File size: {os.path.getsize(filepath)} bytes")
 
 
 if __name__ == "__main__":
