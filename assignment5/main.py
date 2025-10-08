@@ -6,7 +6,8 @@ a game with different player configurations.
 """
 
 from game import Game
-from players import HumanPlayer, TicTacAgent
+from players import HumanPlayer
+from agent import TicTacAgent
 
 
 def main():
