@@ -6,7 +6,7 @@ a reinforcement learning agent for tic-tac-toe.
 """
 
 import random
-from typing import Optional
+from typing import Optional, Tuple, List
 from board import Board
 from players import Player
 
@@ -15,18 +15,32 @@ class TicTacAgent(Player):
     """TicTacAgent that uses reinforcement learning.
     Assesses game state features to inform decision making."""
 
-    def __init__(self, symbol: str, name: str):
-        """Initialize agent with symbol and name."""
+    def __init__(self, symbol: str, name: str, q_table=None, learning_enabled: bool = True):
+        """Initialize agent with symbol, name, and optional Q-learning.
+
+        Args:
+            symbol: Player symbol ('X' or 'O')
+            name: Display name
+            q_table: Optional QTable instance for Q-learning
+            learning_enabled: Whether to use Q-learning if q_table provided
+        """
         super().__init__(symbol, name)
         # State features that will be assessed each turn for RL
         self.current_state = {
             'can_win_this_turn': False,
             'must_block_this_turn': False,
             'center_available': False,
+            'center_owned': False,
             'qty_corners_available': 0,
             'qty_edge_mids_available': 0,
             'total_pieces_placed': 0
         }
+
+        # Q-learning attributes
+        self.q_table = q_table
+        self.learning_enabled = learning_enabled
+        self.last_state: Optional[dict] = None
+        self.last_action: Optional[str] = None
 
     def _can_win_this_turn(self, board: Board) -> bool:
         """Check if agent can win on this turn.
@@ -56,6 +70,11 @@ class TicTacAgent(Player):
         Returns True if center is empty."""
         return board.board[4] is None
 
+    def _center_owned(self, board: Board) -> bool:
+        """Check if agent owns the center position (4).
+        Returns True if center has agent's symbol."""
+        return board.board[4] == self.symbol
+
     def _qty_corners_available(self, board: Board) -> int:
         """Count how many corner positions are available.
         Returns 0-4 representing number of empty corners (0, 2, 6, 8)."""
@@ -80,6 +99,7 @@ class TicTacAgent(Player):
             'can_win_this_turn': self._can_win_this_turn(board),
             'must_block_this_turn': self._must_block_this_turn(board),
             'center_available': self._center_available(board),
+            'center_owned': self._center_owned(board),
             'qty_corners_available': self._qty_corners_available(board),
             'qty_edge_mids_available': self._qty_edge_mids_available(board),
             'total_pieces_placed': self._total_pieces_placed(board)
@@ -148,17 +168,92 @@ class TicTacAgent(Player):
             return random.choice(available_positions)
         return None
 
+    def get_valid_actions(self, board: Board) -> List[str]:
+        """Determine which actions are feasible in current state.
+        Returns list of valid action names."""
+        valid = []
+        if self.win_now(board) is not None:
+            valid.append('win_now')
+        if self.block_opponent(board) is not None:
+            valid.append('block_opponent')
+        if self.take_center(board) is not None:
+            valid.append('take_center')
+        if self.take_edge_mid(board) is not None:
+            valid.append('take_edge_mid')
+        if self.take_corner(board) is not None:
+            valid.append('take_corner')
+        if self.take_random(board) is not None:
+            valid.append('take_random')
+        return valid
+
+    def select_action_via_q_learning(self, board: Board, state: dict) -> Tuple[str, int]:
+        """Use Q-table for ε-greedy action selection.
+        Returns: (action_name, position)"""
+        valid_actions = self.get_valid_actions(board)
+
+        # Use ε-greedy to select action name
+        action_name = self.q_table.epsilon_greedy_select(state, valid_actions)
+
+        # Execute the selected action to get position
+        action_map = {
+            'win_now': self.win_now,
+            'block_opponent': self.block_opponent,
+            'take_center': self.take_center,
+            'take_edge_mid': self.take_edge_mid,
+            'take_corner': self.take_corner,
+            'take_random': self.take_random
+        }
+        position = action_map[action_name](board)
+
+        return action_name, position
+
+    def update_from_transition(self, reward: float, next_state: Optional[dict],
+                               next_board: Optional[Board]):
+        """Perform TD(0) Q-learning update after observing transition.
+        Called after this agent's move and after opponent's move."""
+        if not self.q_table or not self.learning_enabled:
+            return
+
+        if self.last_state is None or self.last_action is None:
+            return  # First move, nothing to update yet
+
+        # Get valid actions for next state (None if terminal)
+        next_valid_actions = None
+        if next_state is not None and next_board is not None:
+            next_valid_actions = self.get_valid_actions(next_board)
+
+        # Apply TD(0) update
+        self.q_table.update_q_value(
+            state=self.last_state,
+            action=self.last_action,
+            reward=reward,
+            next_state=next_state,
+            next_valid_actions=next_valid_actions
+        )
+
+    def reset_episode(self):
+        """Reset episode tracking. Called at start of new game."""
+        self.last_state = None
+        self.last_action = None
+
     def get_move(self, board: Board) -> int:
-        """Select a move based on assessed game state.
-        Currently uses random selection, will be enhanced with RL."""
-        # Assess game state for this turn
+        """Select a move using Q-learning if enabled, else random."""
+        # Assess current game state
         state = self.assess_game_state(board)
 
-        # For now, still make random moves (RL will be added later)
-        available_positions = board.get_available_positions()
-        move = random.choice(available_positions)
+        if self.q_table and self.learning_enabled:
+            # Q-learning mode
+            action_name, position = self.select_action_via_q_learning(board, state)
 
-        # Provide feedback about the agent's choice
-        print(f"{self.name} ({self.symbol}) chooses position {move}")
+            # Store state and action for next TD update
+            self.last_state = state.copy()  # Important: copy the dict
+            self.last_action = action_name
 
-        return move
+            print(f"{self.name} ({self.symbol}) chooses position {position} via {action_name}")
+            return position
+        else:
+            # Fallback: random selection
+            available_positions = board.get_available_positions()
+            move = random.choice(available_positions)
+            print(f"{self.name} ({self.symbol}) chooses position {move}")
+            return move
