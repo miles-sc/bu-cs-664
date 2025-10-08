@@ -16,14 +16,7 @@ class TicTacAgent(Player):
     Assesses game state features to inform decision making."""
 
     def __init__(self, symbol: str, name: str, q_table=None, learning_enabled: bool = True):
-        """Initialize agent with symbol, name, and optional Q-learning.
-
-        Args:
-            symbol: Player symbol ('X' or 'O')
-            name: Display name
-            q_table: Optional QTable instance for Q-learning
-            learning_enabled: Whether to use Q-learning if q_table provided
-        """
+        """Initialize agent with symbol, name, and optional Q-learning."""
         super().__init__(symbol, name)
         # State features that will be assessed each turn for RL
         self.current_state = {
@@ -187,8 +180,7 @@ class TicTacAgent(Player):
         return valid
 
     def select_action_via_q_learning(self, board: Board, state: dict) -> Tuple[str, int]:
-        """Use Q-table for ε-greedy action selection.
-        Returns: (action_name, position)"""
+        """Use Q-table for ε-greedy action selection. Returns (action_name, position)."""
         valid_actions = self.get_valid_actions(board)
 
         # Use ε-greedy to select action name
@@ -209,8 +201,7 @@ class TicTacAgent(Player):
 
     def update_from_transition(self, reward: float, next_state: Optional[dict],
                                next_board: Optional[Board]):
-        """Perform TD(0) Q-learning update after observing transition.
-        Called after this agent's move and after opponent's move."""
+        """Perform TD(0) Q-learning update after observing transition."""
         if not self.q_table or not self.learning_enabled:
             return
 

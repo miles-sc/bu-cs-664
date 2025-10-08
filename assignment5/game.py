@@ -18,13 +18,7 @@ class Game:
     Manages game loop, coordinates players and board, displays state, and declares results."""
 
     def __init__(self, player1: Player, player2: Player, q_table=None):
-        """Initialize a new game with player1 ('X') and player2 ('O').
-
-        Args:
-            player1: First player (X)
-            player2: Second player (O)
-            q_table: Optional QTable for Q-learning
-        """
+        """Initialize a new game with player1 ('X'), player2 ('O'), and optional Q-table."""
         self.board = Board()
         self.players = [player1, player2]
         self.current_player_index = 0

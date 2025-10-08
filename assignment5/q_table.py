@@ -15,13 +15,7 @@ class QTable:
     Stores Q-values for state-action pairs and provides learning methods."""
 
     def __init__(self, alpha: float = 0.1, gamma: float = 0.9, epsilon: float = 0.1):
-        """Initialize Q-table with hyperparameters.
-
-        Args:
-            alpha: Learning rate (0-1)
-            gamma: Discount factor (0-1)
-            epsilon: Exploration rate (0-1)
-        """
+        """Initialize Q-table with hyperparameters (alpha, gamma, epsilon)."""
         self.table: Dict[Tuple[tuple, str], float] = {}
         self.alpha = alpha
         self.gamma = gamma
@@ -29,13 +23,7 @@ class QTable:
 
     def state_to_tuple(self, state: dict) -> tuple:
         """Convert state dict to hashable tuple for dictionary key.
-
-        Args:
-            state: Dictionary of state features
-
-        Returns:
-            Tuple of state values in consistent order
-        """
+        Returns tuple of state values in consistent order."""
         return (
             state['can_win_this_turn'],
             state['must_block_this_turn'],
@@ -47,41 +35,20 @@ class QTable:
         )
 
     def get_q_value(self, state: dict, action: str) -> float:
-        """Get Q-value for state-action pair.
-
-        Args:
-            state: Current state dictionary
-            action: Action name
-
-        Returns:
-            Q-value (0.0 if never seen before)
-        """
+        """Get Q-value for state-action pair (0.0 if never seen)."""
         state_tuple = self.state_to_tuple(state)
         key = (state_tuple, action)
         return self.table.get(key, 0.0)
 
     def set_q_value(self, state: dict, action: str, value: float):
-        """Set Q-value for state-action pair.
-
-        Args:
-            state: Current state dictionary
-            action: Action name
-            value: New Q-value
-        """
+        """Set Q-value for state-action pair."""
         state_tuple = self.state_to_tuple(state)
         key = (state_tuple, action)
         self.table[key] = value
 
     def get_best_action(self, state: dict, valid_actions: List[str]) -> str:
         """Return action with highest Q-value from valid actions.
-
-        Args:
-            state: Current state dictionary
-            valid_actions: List of valid action names
-
-        Returns:
-            Action name with highest Q-value
-        """
+        Ties broken randomly."""
         if not valid_actions:
             raise ValueError("No valid actions provided")
 
@@ -95,30 +62,14 @@ class QTable:
         return random.choice(best_actions)
 
     def get_max_q_value(self, state: dict, valid_actions: List[str]) -> float:
-        """Get maximum Q-value for a state over valid actions.
-
-        Args:
-            state: Current state dictionary
-            valid_actions: List of valid action names
-
-        Returns:
-            Maximum Q-value (0.0 if no valid actions)
-        """
+        """Get maximum Q-value for a state over valid actions."""
         if not valid_actions:
             return 0.0
 
         return max(self.get_q_value(state, action) for action in valid_actions)
 
     def epsilon_greedy_select(self, state: dict, valid_actions: List[str]) -> str:
-        """ε-greedy action selection.
-
-        Args:
-            state: Current state dictionary
-            valid_actions: List of valid action names
-
-        Returns:
-            Selected action name
-        """
+        """ε-greedy action selection: explore with probability ε, else exploit."""
         if not valid_actions:
             raise ValueError("No valid actions provided")
 
@@ -131,17 +82,7 @@ class QTable:
 
     def update_q_value(self, state: dict, action: str, reward: float,
                       next_state: Optional[dict], next_valid_actions: Optional[List[str]]):
-        """Apply TD(0) Q-learning update rule.
-
-        Q(s,a) ← Q(s,a) + α[r + γ·max_a' Q(s',a') - Q(s,a)]
-
-        Args:
-            state: Current state dictionary
-            action: Action taken
-            reward: Immediate reward received
-            next_state: Next state (None if terminal)
-            next_valid_actions: Valid actions in next state (None if terminal)
-        """
+        """Apply TD(0) Q-learning update rule: Q(s,a) ← Q(s,a) + α[r + γ·max_a' Q(s',a') - Q(s,a)]"""
         # Get current Q-value
         current_q = self.get_q_value(state, action)
 
@@ -162,11 +103,7 @@ class QTable:
         self.set_q_value(state, action, new_q)
 
     def save(self, filepath: str):
-        """Save Q-table to disk using pickle.
-
-        Args:
-            filepath: Path to save file
-        """
+        """Save Q-table to disk using pickle."""
         data = {
             'table': self.table,
             'alpha': self.alpha,
@@ -178,14 +115,7 @@ class QTable:
 
     @classmethod
     def load(cls, filepath: str) -> 'QTable':
-        """Load Q-table from disk.
-
-        Args:
-            filepath: Path to load file
-
-        Returns:
-            Loaded QTable instance
-        """
+        """Load Q-table from disk and return QTable instance."""
         with open(filepath, 'rb') as f:
             data = pickle.load(f)
 
@@ -194,9 +124,5 @@ class QTable:
         return q_table
 
     def get_table_size(self) -> int:
-        """Get number of state-action pairs in table.
-
-        Returns:
-            Number of entries in Q-table
-        """
+        """Get number of state-action pairs in table."""
         return len(self.table)

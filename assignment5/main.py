@@ -79,7 +79,7 @@ def play_game():
 
 
 def train_agents():
-    """Train agents using Q-learning."""
+    """Train agents using Q-learning with configurable hyperparameters and progress tracking."""
     print("\n=== Q-Learning Training Mode ===\n")
 
     # Try to load existing Q-table
