@@ -39,13 +39,10 @@ class Game:
         self.current_player_index = 0
         self.q_table = q_table
 
-        # Import here to avoid circular dependency
-        agent_module = load_module("agent", "4agent.py")
-        TicTacAgent = agent_module.TicTacAgent
-
         # If agents have Q-learning, ensure they reference the same Q-table
+        # Use duck typing to check if player is an agent (has learning_enabled attribute)
         for player in self.players:
-            if isinstance(player, TicTacAgent) and player.q_table is None:
+            if hasattr(player, 'learning_enabled') and player.q_table is None:
                 player.q_table = q_table
 
     def get_current_player(self) -> Player:
@@ -58,9 +55,6 @@ class Game:
 
     def play_turn(self):
         """Execute a single turn with TD(0) updates."""
-        agent_module = load_module("agent", "4agent.py")
-        TicTacAgent = agent_module.TicTacAgent
-
         # Show the current board state
         print(self.board.display())
 
@@ -86,20 +80,20 @@ class Game:
             next_board = None
         else:
             reward = 0.0  # Intermediate move
-            if isinstance(current_player, TicTacAgent):
+            if hasattr(current_player, 'assess_game_state'):
                 next_state = current_player.assess_game_state(self.board)
             else:
                 next_state = None
             next_board = self.board
 
         # TD(0) update for current player's move
-        if isinstance(current_player, TicTacAgent):
+        if hasattr(current_player, 'update_from_transition'):
             current_player.update_from_transition(reward, next_state, next_board)
 
         # If game over, also update opponent with their loss/draw reward
         if game_over:
             opponent = self.players[1 - self.current_player_index]
-            if isinstance(opponent, TicTacAgent):
+            if hasattr(opponent, 'update_from_transition'):
                 if winner == current_player.symbol:
                     opponent_reward = -1.0  # Opponent lost
                 elif winner is None:
@@ -110,9 +104,6 @@ class Game:
 
     def play(self):
         """Main game loop with Q-learning support."""
-        agent_module = load_module("agent", "4agent.py")
-        TicTacAgent = agent_module.TicTacAgent
-
         print("\n=== 4x4 TIC-TAC-TOE ===\n")
         print(f"{self.players[0].name} is {self.players[0].symbol}")
         print(f"{self.players[1].name} is {self.players[1].symbol}")
@@ -133,7 +124,7 @@ class Game:
 
         # Reset episode for all agents
         for player in self.players:
-            if isinstance(player, TicTacAgent):
+            if hasattr(player, 'reset_episode'):
                 player.reset_episode()
 
         # Main game loop

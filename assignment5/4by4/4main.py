@@ -199,17 +199,17 @@ def train_agents():
     # Show final metrics
     metrics.record_strategic_qvalues(q_table, num_games)
     metrics.record_qtable_size(q_table.get_table_size())
-    print(f"\nFinal Strategic Learning:")
-    if metrics.can_win_best:
-        action, qval = metrics.can_win_best[-1]
-        print(f"  'Can Win' --> {action:20s} (Q={qval:>7.4f})")
-    if metrics.center_available_best:
-        action, qval = metrics.center_available_best[-1]
-        print(f"  'Middle Zone Available' --> {action:20s} (Q={qval:>7.4f})")
-    if metrics.must_block_best:
-        action, qval = metrics.must_block_best[-1]
-        print(f"  'Must Block' --> {action:20s} (Q={qval:>7.4f})")
-    print(f"{'='*60}\n")
+    # print(f"\nFinal Strategic Learning:")
+    # if metrics.can_win_best:
+    #     action, qval = metrics.can_win_best[-1]
+    #     print(f"  'Can Win' --> {action:20s} (Q={qval:>7.4f})")
+    # if metrics.center_available_best:
+    #     action, qval = metrics.center_available_best[-1]
+    #     print(f"  'Middle Zone Available' --> {action:20s} (Q={qval:>7.4f})")
+    # if metrics.must_block_best:
+    #     action, qval = metrics.must_block_best[-1]
+    #     print(f"  'Must Block' --> {action:20s} (Q={qval:>7.4f})")
+    # print(f"{'='*60}\n")
 
     # Save Q-table
     save_choice = input("\nSave Q-table? (y/n): ")

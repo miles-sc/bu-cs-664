@@ -36,10 +36,13 @@ class LearningMetrics:
         )
         self.can_win_best.append(can_win_best)
 
-        # Best action when middle_zone_available=True
-        middle_zone_best = self._get_best_action_for_feature(
-            q_table, True, feature_index=2
-        )
+        # Best action when qty_middle_zone_available >= 1
+        middle_zone_best = ('none', 0.0)
+        # Find best action when at least 1 middle zone cell is available
+        for value in range(1, 5):  # Check values 1-4
+            temp_best = self._get_best_action_for_feature(q_table, value, feature_index=2)
+            if temp_best[0] != 'none' and temp_best[1] > middle_zone_best[1]:
+                middle_zone_best = temp_best
         self.center_available_best.append(middle_zone_best)
 
         # Best action when must_block=True
@@ -48,13 +51,13 @@ class LearningMetrics:
         )
         self.must_block_best.append(block_best)
 
-    def _get_best_action_for_feature(self, q_table, feature_value: bool,
+    def _get_best_action_for_feature(self, q_table, feature_value,
                                        feature_index: int) -> tuple:
         """Get best action (highest avg Q-value) for states matching a feature.
 
         Returns: (action_name, avg_q_value) or ('none', 0.0) if no matches
 
-        State tuple order: (can_win, must_block, middle_zone_available, middle_zone_owned,
+        State tuple order: (can_win, must_block, qty_middle_zone_available, qty_middle_zone_owned,
                            qty_corners_available, qty_edge_mids_available, total_pieces_placed)
         """
         # Collect Q-values by action
@@ -93,16 +96,16 @@ class LearningMetrics:
             print(f"\nQ-Table Size: {self.qtable_sizes[-1]:,} state-action pairs")
 
         # Strategic Best Actions
-        print(f"\nStrategic Learning (Best Action by State Feature):")
-        if self.can_win_best:
-            action, qval = self.can_win_best[-1]
-            print(f"  'Can Win' --> {action:20s} (Q={qval:>7.4f})")
-        if self.center_available_best:
-            action, qval = self.center_available_best[-1]
-            print(f"  'Middle Zone Available' --> {action:11s} (Q={qval:>7.4f})")
-        if self.must_block_best:
-            action, qval = self.must_block_best[-1]
-            print(f"  'Must Block' --> {action:17s} (Q={qval:>7.4f})")
+        # print(f"\nStrategic Learning (Best Action by State Feature):")
+        # if self.can_win_best:
+        #     action, qval = self.can_win_best[-1]
+        #     print(f"  'Can Win' --> {action:20s} (Q={qval:>7.4f})")
+        # if self.center_available_best:
+        #     action, qval = self.center_available_best[-1]
+        #     print(f"  'Middle Zone Available' --> {action:11s} (Q={qval:>7.4f})")
+        # if self.must_block_best:
+        #     action, qval = self.must_block_best[-1]
+        #     print(f"  'Must Block' --> {action:17s} (Q={qval:>7.4f})")
 
         # Action Distribution
         print(f"\nAction Selection Distribution:")

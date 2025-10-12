@@ -25,12 +25,12 @@ class QTable:
     def state_to_tuple(self, state: dict) -> tuple:
         """Convert state dict to hashable tuple for dictionary key.
         Returns tuple of state values in consistent order.
-        Updated for 4x4 board with middle_zone instead of center."""
+        Updated for 4x4 board with qty_middle_zone (0-4) instead of center boolean."""
         return (
             state['can_win_this_turn'],
             state['must_block_this_turn'],
-            state['middle_zone_available'],
-            state['middle_zone_owned'],
+            state['qty_middle_zone_available'],
+            state['qty_middle_zone_owned'],
             state['qty_corners_available'],
             state['qty_edge_mids_available'],
             state['total_pieces_placed']

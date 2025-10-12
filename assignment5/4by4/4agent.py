@@ -35,8 +35,8 @@ class TicTacAgent(Player):
         self.current_state = {
             'can_win_this_turn': False,
             'must_block_this_turn': False,
-            'middle_zone_available': False,
-            'middle_zone_owned': False,
+            'qty_middle_zone_available': 0,
+            'qty_middle_zone_owned': 0,
             'qty_corners_available': 0,
             'qty_edge_mids_available': 0,
             'total_pieces_placed': 0
@@ -78,17 +78,17 @@ class TicTacAgent(Player):
                 return True
         return False
 
-    def _middle_zone_available(self, board: Board) -> bool:
-        """Check if any middle zone position (5, 6, 9, 10) is available.
-        Returns True if at least one middle zone cell is empty."""
+    def _qty_middle_zone_available(self, board: Board) -> int:
+        """Count how many middle zone positions (5, 6, 9, 10) are available.
+        Returns 0-4 representing number of empty middle zone cells."""
         middle_zone = [5, 6, 9, 10]
-        return any(board.board[pos] is None for pos in middle_zone)
+        return sum(1 for pos in middle_zone if board.board[pos] is None)
 
-    def _middle_zone_owned(self, board: Board) -> bool:
-        """Check if agent owns any middle zone position (5, 6, 9, 10).
-        Returns True if at least one middle zone cell has agent's symbol."""
+    def _qty_middle_zone_owned(self, board: Board) -> int:
+        """Count how many middle zone positions (5, 6, 9, 10) agent owns.
+        Returns 0-4 representing number of middle zone cells with agent's symbol."""
         middle_zone = [5, 6, 9, 10]
-        return any(board.board[pos] == self.symbol for pos in middle_zone)
+        return sum(1 for pos in middle_zone if board.board[pos] == self.symbol)
 
     def _qty_corners_available(self, board: Board) -> int:
         """Count how many corner positions are available (4x4 grid).
@@ -113,8 +113,8 @@ class TicTacAgent(Player):
         self.current_state = {
             'can_win_this_turn': self._can_win_this_turn(board),
             'must_block_this_turn': self._must_block_this_turn(board),
-            'middle_zone_available': self._middle_zone_available(board),
-            'middle_zone_owned': self._middle_zone_owned(board),
+            'qty_middle_zone_available': self._qty_middle_zone_available(board),
+            'qty_middle_zone_owned': self._qty_middle_zone_owned(board),
             'qty_corners_available': self._qty_corners_available(board),
             'qty_edge_mids_available': self._qty_edge_mids_available(board),
             'total_pieces_placed': self._total_pieces_placed(board)
