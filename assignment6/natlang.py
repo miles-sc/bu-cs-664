@@ -3,11 +3,22 @@ Natlang chatbot class.
 A natural language chatbot agent for handling customer service interactions.
 """
 
-from input_assessor import InputAssessor
-import google.generativeai as genai
 import os
+import warnings
 from pathlib import Path
 from dotenv import load_dotenv
+
+# Suppress all warnings
+warnings.filterwarnings('ignore')
+
+# Suppress gRPC/ALTS warnings before importing genai
+os.environ['GRPC_VERBOSITY'] = 'ERROR'
+os.environ['GLOG_minloglevel'] = '3'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['GRPC_ENABLE_FORK_SUPPORT'] = '0'
+
+from input_assessor import InputAssessor
+import google.generativeai as genai
 
 
 class Natlang:
@@ -31,6 +42,7 @@ class Natlang:
     }
     REVIEW_URL = "https://example.com/reviews/earbuds"
     FEEDBACK_URL = "https://example.com/feedback"
+    RETURN_LABEL_URL = "https://example.com/downloads/return_label.pdf"
 
     def __init__(self):
         """
@@ -38,6 +50,9 @@ class Natlang:
         """
         self.assessor = InputAssessor()
         self.human_request_counter = 0
+        self.awaiting_return_info = False
+        self.awaiting_faq_feedback = False
+        self.routed_to_human = False
 
         # Initialize Gemini model for response generation
         env_path = Path(__file__).parent / '.env'
@@ -85,68 +100,101 @@ Generate an appropriate response:"""
         response = self.response_model.generate_content(prompt)
         return response.text.strip()
 
-    def route_to_human(self, user_input: str, reason: str = "general") -> str:
+    def route_to_human(self, user_input: str, reason: str = "general inquiry") -> str:
         """
         Route customer to a live agent with appropriate message.
 
         Args:
             user_input: The customer's message
-            reason: The reason for routing (e.g., "anger", "request", "general")
+            reason: The reason for routing (e.g., "customer anger", "customer request",
+                    "faqs didn't help", "return info issue", "general inquiry")
 
         Returns:
             str: Response notifying customer they're being routed to an agent
         """
-        if reason == "anger":
-            instructions = """You are a customer service chatbot. The customer appears angry or frustrated.
+        self.routed_to_human = True
+
+        instructions = f"""You are a customer service chatbot. You need to route the customer to a live agent.
+
+Reason for routing: {reason}
+
 Generate a brief, empathetic message that:
-1. Acknowledges their frustration
-2. Notifies them you are routing them to a live agent immediately
+1. Acknowledges the situation based on the reason provided
+2. Notifies them you are connecting them with a live agent who can better assist them
 3. Thanks them for their patience
-Keep the tone professional, calm, and respectful."""
-        else:
-            instructions = """You are a customer service chatbot. You need to route the customer to a live agent.
-Generate a brief, helpful message that:
-1. Notifies them you are connecting them with a live agent
-2. Thanks them for their patience
-Keep the tone professional and helpful."""
+Keep the tone professional, helpful, and respectful."""
 
         return self.generate_response(user_input, instructions)
 
-    def refund_processing(self, user_input: str, assessment: dict) -> str:
+    def validate_return_info(self, user_input: str) -> bool:
         """
-        Handle refund request with apology and required information collection.
+        Check if user input contains a 5-digit zip code and 6-character order number.
 
         Args:
             user_input: The customer's message
-            assessment: The assessment dictionary to check for issues mentioned
 
         Returns:
-            str: Response handling the refund request
+            bool: True if the input contains both required pieces of information in correct format
         """
-        # Check if customer mentioned any issues (sadness, anger, disgust, problems)
-        has_issue = False
-        issue_indicators = [
-            "Input expresses sadness",
-            "Input expresses anger",
-            "Input expresses disgust",
-            "FAQ: How to troubleshoot error messages and common issues"
-        ]
-        for indicator in issue_indicators:
-            if indicator in assessment:
-                score, confidence = assessment[indicator]
-                if score >= self.MEDIUM_SCORE and confidence >= self.MEDIUM_CONFIDENCE:
-                    has_issue = True
-                    break
+        prompt = """You are a validator for customer service information. Analyze the following customer message to determine if it contains BOTH:
+1. A 5-digit zip code (numbers only, exactly 5 digits)
+2. A 6-character order number (alphanumeric, exactly 6 characters)
 
-        instructions = f"""You are a customer service chatbot. The customer is requesting a refund.
+Customer message: "{}"
+
+Respond with ONLY "YES" if BOTH pieces of information are present in the correct format, or "NO" if either is missing or in the wrong format.""".format(user_input)
+
+        response = self.response_model.generate_content(prompt)
+        result = response.text.strip().upper()
+        return result == "YES"
+
+    def return_processing(self, user_input: str, assessment: dict) -> str:
+        """
+        Handle return request with apology and required information collection.
+
+        Args:
+            user_input: The customer's message
+            assessment: The assessment dictionary (unused, kept for compatibility)
+
+        Returns:
+            str: Response handling the return request
+        """
+        instructions = """You are a customer service chatbot. The customer is requesting a return.
 Generate a response that:
-1. {"Apologizes for any issues they experienced with the product" if has_issue else "Acknowledges their refund request"}
-2. Requests their zip code and order number to process the refund
+1. Apologizes for any issues and provides assurance
+2. Requests their 5-digit zip code and 6-character order number to process the return
 3. Mentions that once we have this information, we'll send them a return shipping label to mail back their product
-4. Offers a link to provide private feedback on the product: {self.FEEDBACK_URL}
 Keep the tone professional, helpful, and empathetic."""
 
+        self.awaiting_return_info = True
         return self.generate_response(user_input, instructions)
+
+    def handle_return_info_response(self, user_input: str) -> str:
+        """
+        Handle the customer's response after requesting return information.
+        Validates if they provided the correct format (5-digit zip + 6-character order number).
+
+        Args:
+            user_input: The customer's message containing return information
+
+        Returns:
+            str: Response either confirming return processing or routing to human
+        """
+        if self.validate_return_info(user_input):
+            # Valid format provided
+            instructions = f"""You are a customer service chatbot. The customer has provided their zip code and order number for a return.
+Generate a response that:
+1. Thanks them for providing the information
+2. Confirms that they will receive a refund as soon as their return has been processed
+3. Provides them with this link to download their return shipping label: {self.RETURN_LABEL_URL}
+Keep the tone professional, helpful, and grateful."""
+
+            self.awaiting_return_info = False
+            return self.generate_response(user_input, instructions)
+        else:
+            # Invalid format - route to human
+            self.awaiting_return_info = False
+            return self.route_to_human(user_input, "invalid return information format")
 
     def provide_faqs(self, user_input: str, assessment: dict) -> str:
         """
@@ -169,7 +217,7 @@ Keep the tone professional, helpful, and empathetic."""
 
         if not relevant_faqs:
             # No FAQs matched, shouldn't normally happen if this method is called
-            return self.route_to_human(user_input, "general")
+            return self.route_to_human(user_input, "no matching FAQ articles found")
 
         # Build FAQ list for the instructions
         faq_list = "\n".join([f"- {faq.replace('FAQ: ', '')}: {url}" for faq, url in relevant_faqs])
@@ -180,10 +228,66 @@ Generate a response that:
 2. Provides the following FAQ link(s) and recommends they read the article(s):
 {faq_list}
 3. Asks if the document(s) helped with their issue
-4. Mentions that if the FAQ doesn't help, you can connect them with a live agent
 Keep the tone professional, helpful, and respectful."""
 
+        self.awaiting_faq_feedback = True
         return self.generate_response(user_input, instructions)
+
+    def validate_faq_response(self, user_input: str) -> bool:
+        """
+        Check if the customer indicates the FAQ documents helped them.
+
+        Args:
+            user_input: The customer's message
+
+        Returns:
+            bool: True if customer indicates they were helped, False if not
+        """
+        prompt = """You are a validator for customer service interactions. Analyze the following customer message to determine if the customer is indicating that the FAQ documentation helped them resolve their issue.
+
+Customer message: "{}"
+
+Look for positive indicators like:
+- "Yes", "Yeah", "That helped", "That worked", "Thanks, I'm good now"
+- Expressions of gratitude or satisfaction
+- Confirmation that their problem is solved
+
+Look for negative indicators like:
+- "No", "Nope", "That didn't help", "Still having issues", "I'm still confused"
+- Requests for more help
+- Expressions of frustration
+
+Respond with ONLY "YES" if the customer indicates they were helped, or "NO" if they indicate they were not helped or need more assistance.""".format(user_input)
+
+        response = self.response_model.generate_content(prompt)
+        result = response.text.strip().upper()
+        return result == "YES"
+
+    def handle_faq_feedback_response(self, user_input: str) -> str:
+        """
+        Handle the customer's response after providing FAQ documents.
+        Determines if the FAQs helped and either continues conversation or routes to human.
+
+        Args:
+            user_input: The customer's message about whether FAQs helped
+
+        Returns:
+            str: Response either asking if they need more help or routing to human
+        """
+        if self.validate_faq_response(user_input):
+            # FAQs helped - ask if there's anything else
+            instructions = """You are a customer service chatbot. The customer has indicated that the FAQ documents helped them.
+Generate a response that:
+1. Expresses happiness that the documentation was helpful
+2. Asks if there is anything else you can help them with
+Keep the tone friendly, professional, and helpful."""
+
+            self.awaiting_faq_feedback = False
+            return self.generate_response(user_input, instructions)
+        else:
+            # FAQs didn't help - route to human
+            self.awaiting_faq_feedback = False
+            return self.route_to_human(user_input, "FAQ documents didn't help")
 
     def handle_positive_feedback(self, user_input: str) -> str:
         """
@@ -214,6 +318,14 @@ Keep the tone friendly, appreciative, and professional."""
         Returns:
             str: The chatbot's response based on the decision tree
         """
+        # Check if we're awaiting return information
+        if self.awaiting_return_info:
+            return self.handle_return_info_response(user_input)
+
+        # Check if we're awaiting FAQ feedback
+        if self.awaiting_faq_feedback:
+            return self.handle_faq_feedback_response(user_input)
+
         # Get assessment for the input
         assessment = self.get_assessment(user_input)
 
@@ -226,7 +338,7 @@ Keep the tone friendly, appreciative, and professional."""
         positive_feedback_score, positive_feedback_conf = assessment.get(
             "Input expresses positive feedback about their phone", [0.0, 0.0]
         )
-        refund_request_score, refund_request_conf = assessment.get(
+        return_request_score, return_request_conf = assessment.get(
             "Input contains a request for a refund or return", [0.0, 0.0]
         )
 
@@ -234,7 +346,7 @@ Keep the tone friendly, appreciative, and professional."""
 
         # 1. Check for high anger - route to human immediately
         if anger_score >= self.MEDIUM_SCORE and anger_conf >= self.MEDIUM_CONFIDENCE:
-            return self.route_to_human(user_input, reason="anger")
+            return self.route_to_human(user_input, reason="customer expressing anger or frustration")
 
         # 2. Check for human request
         if human_request_score >= self.MEDIUM_SCORE and human_request_conf >= self.MEDIUM_CONFIDENCE:
@@ -250,11 +362,11 @@ Keep the tone helpful and respectful."""
                 return self.generate_response(user_input, instructions)
             else:
                 # Second request - route to human
-                return self.route_to_human(user_input, reason="request")
+                return self.route_to_human(user_input, reason="customer repeatedly requested human agent")
 
-        # 3. Check for refund request
-        if refund_request_score >= self.MEDIUM_SCORE and refund_request_conf >= self.MEDIUM_CONFIDENCE:
-            return self.refund_processing(user_input, assessment)
+        # 3. Check for return request
+        if return_request_score >= self.MEDIUM_SCORE and return_request_conf >= self.MEDIUM_CONFIDENCE:
+            return self.return_processing(user_input, assessment)
 
         # 4. Check for FAQ matches
         has_faq_match = False
@@ -273,4 +385,4 @@ Keep the tone helpful and respectful."""
             return self.handle_positive_feedback(user_input)
 
         # 6. Default - route to human
-        return self.route_to_human(user_input, reason="general")
+        return self.route_to_human(user_input, reason="inquiry outside chatbot capabilities")

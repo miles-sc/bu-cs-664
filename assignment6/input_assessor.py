@@ -1,8 +1,19 @@
 import json
 import os
 import re
+import warnings
 from pathlib import Path
 from dotenv import load_dotenv
+
+# Suppress all warnings
+warnings.filterwarnings('ignore')
+
+# Suppress gRPC/ALTS warnings before importing genai
+os.environ['GRPC_VERBOSITY'] = 'ERROR'
+os.environ['GLOG_minloglevel'] = '3'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['GRPC_ENABLE_FORK_SUPPORT'] = '0'
+
 import google.generativeai as genai
 
 
