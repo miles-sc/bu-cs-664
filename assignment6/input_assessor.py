@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from pathlib import Path
 from dotenv import load_dotenv
 import google.generativeai as genai
@@ -65,7 +66,8 @@ Instructions:
   "FAQ: How to back up and restore data on your phone": [0.0, 0.0],
   "FAQ: How to reset your phone's password": [0.0, 0.0],
   "Input expresses positive feedback about their phone": [0.0, 0.0],
-  "Input contains a request to contact a live agent or human": [0.0, 0.0]
+  "Input contains a request to contact a live agent or human": [0.0, 0.0],
+  "Input contains a request for a refund or return": [0.0, 0.0]
 }
 
 (End instructions)
@@ -97,6 +99,14 @@ Follow the above instructions in evaluation of the following customer input mess
 
             # Extract the text response
             response_text = response.text.strip()
+
+            # Strip markdown code fences if present (e.g., ```json ... ```)
+            # Remove opening code fence
+            response_text = re.sub(r'^```json\s*', '', response_text)
+            response_text = re.sub(r'^```\s*', '', response_text)
+            # Remove closing code fence
+            response_text = re.sub(r'\s*```$', '', response_text)
+            response_text = response_text.strip()
 
             # Parse the JSON response
             assessment_result = json.loads(response_text)
@@ -135,7 +145,8 @@ Follow the above instructions in evaluation of the following customer input mess
             "FAQ: How to back up and restore data on your phone",
             "FAQ: How to reset your phone's password",
             "Input expresses positive feedback about their phone",
-            "Input contains a request to contact a live agent or human"
+            "Input contains a request to contact a live agent or human",
+            "Input contains a request for a refund or return"
         ]
 
         # Check all expected keys are present
