@@ -18,3 +18,5 @@ ENV/
 .idea/
 *.swp
 *.swo
+
+assessor_tester.py
